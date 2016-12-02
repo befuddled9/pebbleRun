@@ -1,14 +1,15 @@
 #include <pebble_worker.h>
 
-#define WORKER_TICKS 0
+#define STEPS 0
 
 static uint16_t s_ticks = 0;
 static time_t last_time;
+static uint64_t s_steps_total = 0;
 
-static void tick_handler(struct tm *tick_timer, TimeUnits units_changed) {
-  uint32_t numRcvd = 0;
+static void cadence_handler(struct tm *tick_timer, TimeUnits units_changed) {
+  uint32_t numRcvd= 0;
   HealthMinuteData minute_data;
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Tick Handler: Enter");
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "cadence_handler: Enter");
     
   // Update value
   s_ticks++;
@@ -23,32 +24,35 @@ static void tick_handler(struct tm *tick_timer, TimeUnits units_changed) {
     goto done;
   }
   
+  s_steps_total += minute_data.steps;
+  
   // Construct a data packet
   AppWorkerMessage msg_data = {
-    .data0 = s_ticks,
-    .data1 = (minute_data.steps/2)
+    .data0 = minute_data.steps,
+    .data1 = s_steps_total
   };
 
   // Send the data to the foreground app
-  app_worker_send_message(WORKER_TICKS, &msg_data);
+  app_worker_send_message(STEPS, &msg_data);
 
 done:
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Tick Handler: Exit");
 }
 
-static void worker_init() {
+static void cadence_init() {
   last_time = time(NULL);
   // Use the TickTimer Service as a data source
-  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
+  tick_timer_service_subscribe(MINUTE_UNIT, cadence_handler);
 }
 
-static void worker_deinit() {
+static void cadence_deinit() {
   // Stop using the TickTimerService
   tick_timer_service_unsubscribe();
 }
 
 int main(void) {
-  worker_init();
+  cadence_init();
   worker_event_loop();
-  worker_deinit();
+  cadence_deinit();
+  return 0;
 }
